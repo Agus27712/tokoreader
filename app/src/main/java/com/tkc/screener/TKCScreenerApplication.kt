@@ -12,6 +12,7 @@ class TKCScreenerApplication : Application(), Application.ActivityLifecycleCallb
         super.onCreate()
         AppContextProvider.init(this)
         registerActivityLifecycleCallbacks(this)
+        com.tkc.screener.util.DebugLogManager.initTimberTree()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }

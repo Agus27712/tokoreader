@@ -162,8 +162,8 @@ fun TradingModeSettings(
         ModeOptionCard(
             title = "TRENCHING",
             tag = "FLOW & TRENCH",
-            tagBg = Color(0xFFFBBF24).copy(alpha = 0.18f),
-            tagFg = Color(0xFFFBBF24),
+            tagBg = TvAmber.copy(alpha = 0.18f),
+            tagFg = TvAmber,
             isSelected = strategyMode == StrategyMode.TRENCHING,
             desc = "Membaca market flow, kompresi trench, dan timing entry saat pullback sehat terkonfirmasi (Anti-FOMO).",
             bullets = listOf(

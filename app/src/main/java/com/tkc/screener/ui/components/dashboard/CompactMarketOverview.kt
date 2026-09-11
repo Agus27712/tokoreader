@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -72,7 +73,8 @@ fun DashboardMockupHeader(
     onRefresh: () -> Unit,
     onMenuClick: () -> Unit = {},
     onAddAsset: () -> Unit = {},
-    onEditStrategy: () -> Unit = {}
+    onEditStrategy: () -> Unit = {},
+    onOpenDebugLog: (() -> Unit)? = null
 ) {
     val totalVolume = allTicks.values.sumOf { it.volume24h }
     val avgVolume = if (allTicks.isNotEmpty()) totalVolume / allTicks.size else 0.0
@@ -239,18 +241,38 @@ fun DashboardMockupHeader(
                             .rotate(currentRotationAngle)
                     )
                 }
+
+                if (onOpenDebugLog != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(TvSurfaceVariant)
+                            .border(0.8.dp, TvBorder, RoundedCornerShape(6.dp))
+                            .clickable(onClick = onOpenDebugLog),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Terminal,
+                            contentDescription = "Debug Output Logcat",
+                            tint = TvGreen,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
         }
 
         Spacer(Modifier.height(6.dp))
 
         // Compact Unified Stat Strip: 24H VOL | AVG VOL | STRATEGI
+        val isLightOverview = LocalAppColors.current == LightAppColors
         val (modeBg, modeBorder, modeColor, modeLabel) = when (strategyMode) {
-            StrategyMode.SCALPING -> listOf(Color(0xFF123D2A), Color(0xFF1B5E38), TvGreen, "SCALPING")
-            StrategyMode.SECOND_WAVE -> listOf(Color(0xFF0F3845), Color(0xFF155060), Color(0xFF00E5FF), "2ND-WAVE")
-            StrategyMode.SWING -> listOf(Color(0xFF122840), Color(0xFF1E3A5F), Color(0xFF72B7FF), "SWING")
-            StrategyMode.OFFICE_DAILY -> listOf(Color(0xFF1F2448), Color(0xFF3730A3), Color(0xFFA5B4FC), "OFFICE")
-            StrategyMode.TRENCHING -> listOf(Color(0xFF352005), Color(0xFF78350F), Color(0xFFFCD34D), "TRENCH")
+            StrategyMode.SCALPING -> if (isLightOverview) listOf(Color(0xFFECFDF5), Color(0xFFA7F3D0), Color(0xFF047857), "SCALPING") else listOf(Color(0xFF123D2A), Color(0xFF1B5E38), TvGreen, "SCALPING")
+            StrategyMode.SECOND_WAVE -> if (isLightOverview) listOf(Color(0xFFF0FDFA), Color(0xFF99F6E4), Color(0xFF0F766E), "2ND-WAVE") else listOf(Color(0xFF0F3845), Color(0xFF155060), Color(0xFF00E5FF), "2ND-WAVE")
+            StrategyMode.SWING -> if (isLightOverview) listOf(Color(0xFFEFF6FF), Color(0xFFBFDBFE), Color(0xFF1D4ED8), "SWING") else listOf(Color(0xFF122840), Color(0xFF1E3A5F), Color(0xFF72B7FF), "SWING")
+            StrategyMode.OFFICE_DAILY -> if (isLightOverview) listOf(Color(0xFFEEF2FF), Color(0xFFC7D2FE), Color(0xFF4338CA), "OFFICE") else listOf(Color(0xFF1F2448), Color(0xFF3730A3), Color(0xFFA5B4FC), "OFFICE")
+            StrategyMode.TRENCHING -> if (isLightOverview) listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFFB45309), "TRENCH") else listOf(Color(0xFF352005), Color(0xFF78350F), Color(0xFFFCD34D), "TRENCH")
         }
 
         Row(

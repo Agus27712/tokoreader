@@ -7,6 +7,7 @@ import com.tkc.screener.service.TokocryptoMarketService
 import com.tkc.screener.trading.SimulationOrderResult
 import com.tkc.screener.trading.SimulationOrderSide
 import com.tkc.screener.trading.SimulationOrderType
+import com.tkc.screener.util.PriceFormatter
 import kotlinx.coroutines.launch
 
 fun TradingViewModel.executeCancelRealOrder(symbol: String, orderId: String, onResult: (Boolean, String) -> Unit) =
@@ -25,7 +26,14 @@ fun TradingViewModel.saveRealCredentialsAndPin(pin: String, apiKey: String, secr
 fun TradingViewModel.wipeSecurityCredentials() { prefs.wipeAllRealSecurityData() }
 fun TradingViewModel.verifyPin(pin: String): Boolean = realCoordinator.verifyPin(pin)
 fun TradingViewModel.lockPin() = realCoordinator.lockPin()
-fun TradingViewModel.setRealBuyMode(enabled: Boolean, pin: String? = null): Boolean = realCoordinator.setRealBuyMode(enabled, pin)
+fun TradingViewModel.setRealBuyMode(enabled: Boolean, pin: String? = null): Boolean {
+    val success = realCoordinator.setRealBuyMode(enabled, pin)
+    if (success) {
+        val modeStr = if (enabled) "MODE REAL (TOKOCRYPTO API)" else "MODE SIMULASI VIRTUAL"
+        com.tkc.screener.util.DebugLogManager.logUserAction("Ganti Mode Trading", "Diubah ke $modeStr")
+    }
+    return success
+}
 fun TradingViewModel.fetchRealBalance() = realCoordinator.fetchRealBalance()
 fun TradingViewModel.refreshRealBalance() {
     viewModelScope.launch {
@@ -34,8 +42,10 @@ fun TradingViewModel.refreshRealBalance() {
     }
     fetchRealBalance()
 }
-fun TradingViewModel.executeRealTrade(pair: String, type: String, price: Long, amountIdr: Double, tp1: Double = 0.0, tp2: Double = 0.0, onResult: (Boolean, String) -> Unit) =
+fun TradingViewModel.executeRealTrade(pair: String, type: String, price: Long, amountIdr: Double, tp1: Double = 0.0, tp2: Double = 0.0, onResult: (Boolean, String) -> Unit) {
+    com.tkc.screener.util.DebugLogManager.logUserAction("Kirim Order REAL Tokocrypto", "$type $pair | Amount: Rp ${PriceFormatter.formatRawDecimal(amountIdr)} | Limit: $price")
     realCoordinator.executeRealTrade(pair, type, price, amountIdr, tp1, tp2, onResult)
+}
 
 fun TradingViewModel.refreshSimulationState() = simCoordinator.refresh()
 fun TradingViewModel.refreshSpotPosition() {
@@ -61,11 +71,21 @@ fun TradingViewModel.submitSimulationOrder(
     price: Double,
     stopPrice: Double = 0.0,
     quantity: Double
-): SimulationOrderResult = simCoordinator.submitOrder(
-    pair = _selectedPair.value,
-    currentPrice = marketDataCoordinator.currentTick.value?.price ?: price,
-    side = side, type = type, price = price, stopPrice = stopPrice, quantity = quantity
-)
+): SimulationOrderResult {
+    com.tkc.screener.util.DebugLogManager.logTrade(
+        mode = "SIMULASI",
+        pair = _selectedPair.value.symbol,
+        type = side.name,
+        price = price,
+        qty = quantity,
+        details = "Type: ${type.name}"
+    )
+    return simCoordinator.submitOrder(
+        pair = _selectedPair.value,
+        currentPrice = marketDataCoordinator.currentTick.value?.price ?: price,
+        side = side, type = type, price = price, stopPrice = stopPrice, quantity = quantity
+    )
+}
 
 fun TradingViewModel.cancelSimulationOrder(orderId: String): Boolean = simCoordinator.cancelOrder(orderId)
 fun TradingViewModel.cancelAllSimulationOrders(symbol: String? = null): Int = simCoordinator.cancelAllOrders(symbol)

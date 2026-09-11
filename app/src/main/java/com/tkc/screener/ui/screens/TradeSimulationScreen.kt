@@ -456,7 +456,7 @@ private fun SimulationTopBar(
         ) {
             Text(
                 text = "${pair.baseAsset}/${pair.quoteAsset}",
-                color = Color.White,
+                color = TvTextPrimary,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -464,7 +464,7 @@ private fun SimulationTopBar(
             Icon(
                 imageVector = Icons.Default.KeyboardArrowDown,
                 contentDescription = "Pilih Koin",
-                tint = Color.White,
+                tint = TvTextPrimary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -477,7 +477,7 @@ private fun SimulationTopBar(
                 Icon(
                     imageVector = Icons.Default.CandlestickChart,
                     contentDescription = "Buka Chart",
-                    tint = Color.White,
+                    tint = TvTextPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -485,7 +485,7 @@ private fun SimulationTopBar(
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "Menu Lainnya",
-                    tint = Color.White,
+                    tint = TvTextPrimary,
                     modifier = Modifier.size(22.dp)
                 )
             }

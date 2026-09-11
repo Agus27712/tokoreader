@@ -81,6 +81,7 @@ fun parseInlineMarkdown(
     val greenColor = TvGreen
     val redColor = TvRed
     val blueColor = TvBlue
+    val amberColor = com.tkc.screener.ui.theme.TvAmber
     val textColor = defaultColor
 
     return buildAnnotatedString {
@@ -114,7 +115,7 @@ fun parseInlineMarkdown(
 
                         inner.contains("TAHAN", ignoreCase = true) ||
                         inner.contains("HOLD", ignoreCase = true) ||
-                        inner.contains("Netral", ignoreCase = true) -> Color(0xFFFFB300)
+                        inner.contains("Netral", ignoreCase = true) -> amberColor
 
                         else -> textColor
                     }

@@ -38,6 +38,7 @@ import com.tkc.screener.model.MarketConnectionState
 import com.tkc.screener.model.TradingPair
 import com.tkc.screener.service.TokocryptoMarketService
 import com.tkc.screener.ui.components.dashboard.*
+import com.tkc.screener.ui.components.debug.DebugLogDialog
 import com.tkc.screener.ui.theme.*
 import com.tkc.screener.viewmodel.*
 
@@ -81,6 +82,7 @@ fun DashboardScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var showNewsScreener by remember { mutableStateOf(false) }
     var showStrategyDialog by remember { mutableStateOf(false) }
+    var showDebugLogDialog by remember { mutableStateOf(false) }
 
     val defaultQuote = "IDR"
 
@@ -161,7 +163,8 @@ fun DashboardScreen(
                 },
                 onRefresh = { viewModel.retryConnection() },
                 onAddAsset = { showAddDialog = true },
-                onEditStrategy = { showStrategyDialog = true }
+                onEditStrategy = { showStrategyDialog = true },
+                onOpenDebugLog = { showDebugLogDialog = true }
             )
 
         if (connectionState is MarketConnectionState.ConnectionLost) {
@@ -366,6 +369,11 @@ fun DashboardScreen(
             }
         )
     }
+
+    DebugLogDialog(
+        show = showDebugLogDialog,
+        onDismiss = { showDebugLogDialog = false }
+    )
 
     if (showNewsScreener) {
         NewsAiScreenerModal(

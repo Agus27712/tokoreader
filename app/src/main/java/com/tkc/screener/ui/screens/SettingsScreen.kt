@@ -30,6 +30,8 @@ import com.tkc.screener.config.ScalpingSensitivity
 import com.tkc.screener.config.StrategyMode
 import com.tkc.screener.util.MarketDataCache
 import com.tkc.screener.ui.theme.*
+import com.tkc.screener.ui.components.debug.DebugLogDialog
+import com.tkc.screener.util.DebugLogManager
 import com.tkc.screener.ui.components.security.SecurityPinDialog
 import com.tkc.screener.ui.components.security.SetupRealApiDialog
 import com.tkc.screener.ui.components.settings.*
@@ -65,10 +67,10 @@ fun SettingsScreen(viewModel: TradingViewModel, onBack: () -> Unit, modifier: Mo
     var pendingRealBuyToggle by remember { mutableStateOf(false) }
     var updateRepo by remember { mutableStateOf(prefs.updateRepo) }
     var updateToken by remember { mutableStateOf(prefs.updateGitHubToken) }
-    var isRealSimSyncEnabled by remember { mutableStateOf(prefs.isRealSimSyncEnabled) }
     var priceFeedThrottleMs by remember { mutableStateOf(prefs.priceFeedThrottleMs) }
     var saved by remember { mutableStateOf(false) }
     var cacheCleared by remember { mutableStateOf(false) }
+    var showDebugLogDialog by remember { mutableStateOf(false) }
 
     val completedLessons = remember { prefs.getCompletedLearningLessons() }
     val releaseInfo by viewModel.githubReleaseInfo.collectAsStateWithLifecycle()
@@ -365,79 +367,6 @@ fun SettingsScreen(viewModel: TradingViewModel, onBack: () -> Unit, modifier: Mo
 
         Spacer(Modifier.height(16.dp))
 
-        // SECTION: SINKRONISASI ASET REAL & SIMULASI
-        SectionHeader("SINKRONISASI ASET (MIRRORING)")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = TvCardBackground),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (isRealSimSyncEnabled) TvGreen else TvBorder
-            )
-        ) {
-            Column(Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "SINKRONISASI REAL & SIMULASI",
-                                color = if (isRealSimSyncEnabled) TvGreen else TvTextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (isRealSimSyncEnabled) TvGreen.copy(alpha = 0.15f) else TvSurfaceVariant,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    if (isRealSimSyncEnabled) "SHADOW MIRROR ON" else "ISOLASI SIMULASI",
-                                    color = if (isRealSimSyncEnabled) TvGreen else TvTextSecondary,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = if (isRealSimSyncEnabled)
-                                "Aset real Tokocrypto & simulasi dicerminkan (mirroring 1:1) di portofolio dan riwayat transaksi untuk kemudahan pantau."
-                            else
-                                "Isolasi trade simulasi only: Hanya menampilkan simulasi murni, tidak ada aset real yang tersinkronisasi.",
-                            color = TvTextSecondary,
-                            fontSize = 10.sp,
-                            lineHeight = 14.sp
-                        )
-                    }
-
-                    Switch(
-                        checked = isRealSimSyncEnabled,
-                        onCheckedChange = {
-                            isRealSimSyncEnabled = it
-                            saved = false
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.Black,
-                            checkedTrackColor = TvGreen,
-                            uncheckedThumbColor = TvTextSecondary,
-                            uncheckedTrackColor = TvSurfaceVariant
-                        )
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
         // SECTION: PERFORMA FEED HARGA & THROTTLING UI
         SectionHeader("PERFORMA & THROTTLING UI (VOLATILITY SHIELD)")
         Card(
@@ -573,6 +502,85 @@ fun SettingsScreen(viewModel: TradingViewModel, onBack: () -> Unit, modifier: Mo
             onDownloadAndInstall = { viewModel.downloadAndInstallUpdate(context, updateRepo, updateToken) }
         )
 
+        Spacer(Modifier.height(16.dp))
+
+        // SECTION 5: DEBUGGING & TRACKING OUTPUT (LOGCAT)
+        SectionHeader("DEBUG & OUTPUT SYSTEM (LOGCAT)")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = TvCardBackground),
+            border = androidx.compose.foundation.BorderStroke(1.dp, TvBorder)
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BugReport, null, tint = TvGreen, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "DEBUG OUTPUT & LOG TRACKER",
+                        color = TvTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Lacak output aplikasi, status koneksi (WebSocket/REST), aktivitas trade user, & error logcat secara realtime. Bisa diekspor ke SD Card / folder Downloads.",
+                    color = TvTextSecondary,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { showDebugLogDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = TvGreen, contentColor = Color.Black),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(40.dp)
+                    ) {
+                        Icon(Icons.Default.Terminal, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("BUKA LOGCAT", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val res = DebugLogManager.exportLogsToStorage(context)
+                            res.onSuccess { file ->
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Log Berhasil Diekspor Ke SD Card!\nPath: ${file.absolutePath}",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }.onFailure { err ->
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Gagal ekspor: ${err.localizedMessage}",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TvBorder),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(40.dp)
+                    ) {
+                        Icon(Icons.Default.SaveAlt, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("EKSPOR SDCARD", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        DebugLogDialog(
+            show = showDebugLogDialog,
+            onDismiss = { showDebugLogDialog = false }
+        )
+
         Spacer(Modifier.height(18.dp))
 
         // Action Buttons: Simpan Perubahan & Batal
@@ -589,8 +597,6 @@ fun SettingsScreen(viewModel: TradingViewModel, onBack: () -> Unit, modifier: Mo
                 prefs.geminiApiKey = gemini
                 prefs.updateRepo = updateRepo
                 prefs.updateGitHubToken = updateToken
-                prefs.isRealSimSyncEnabled = isRealSimSyncEnabled
-                viewModel.setRealSimSyncEnabled(isRealSimSyncEnabled)
                 prefs.priceFeedThrottleMs = priceFeedThrottleMs
                 viewModel.setUiPriceThrottleMs(priceFeedThrottleMs)
                 val currentFees = prefs.tradingFees

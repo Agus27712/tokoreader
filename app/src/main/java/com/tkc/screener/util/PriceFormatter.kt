@@ -9,32 +9,38 @@ object PriceFormatter {
 
     /** Format harga dengan simbol mata uang dinamis (IDR / USDT / BIDR / USD) */
     fun formatPrice(price: Double, showSymbol: Boolean = true, quoteAsset: String = "IDR"): String {
-        if (price.isNaN() || price.isInfinite() || price <= 0) {
+        if (price.isNaN() || price.isInfinite() || price == 0.0) {
             val isUsdt = quoteAsset.equals("USDT", true) || quoteAsset.equals("USD", true)
             return if (!showSymbol) "0" else if (isUsdt) "$0.00" else "Rp 0"
         }
+        val isNegative = price < 0
+        val absPrice = abs(price)
+        val signStr = if (isNegative) "-" else ""
         val isUsdt = quoteAsset.equals("USDT", true) || quoteAsset.equals("USD", true)
+
         if (isUsdt) {
             val prefix = if (showSymbol) "$" else ""
             val symbols = DecimalFormatSymbols(Locale.US)
-            return when {
-                price < 0.0001 -> prefix + DecimalFormat("0.########", symbols).format(price)
-                price < 1.0 -> prefix + DecimalFormat("0.######", symbols).format(price)
-                price < 10.0 -> prefix + DecimalFormat("0.####", symbols).format(price)
-                else -> prefix + DecimalFormat("#,##0.00", symbols).format(price)
+            val formatted = when {
+                absPrice < 0.0001 -> prefix + DecimalFormat("0.########", symbols).format(absPrice)
+                absPrice < 1.0 -> prefix + DecimalFormat("0.######", symbols).format(absPrice)
+                absPrice < 10.0 -> prefix + DecimalFormat("0.####", symbols).format(absPrice)
+                else -> prefix + DecimalFormat("#,##0.00", symbols).format(absPrice)
             }
+            return "$signStr$formatted"
         } else {
             val prefix = if (showSymbol) "Rp " else ""
-            val rounded = kotlin.math.round(price).toLong()
             val symbols = DecimalFormatSymbols(Locale("id", "ID")).apply {
                 groupingSeparator = '.'
                 decimalSeparator = ','
             }
-            return if (price < 1.0) {
-                prefix + DecimalFormat("0.########", symbols).format(price)
+            val formatted = if (absPrice < 1.0) {
+                prefix + DecimalFormat("0.########", symbols).format(absPrice)
             } else {
+                val rounded = kotlin.math.round(absPrice).toLong()
                 prefix + DecimalFormat("#,##0", symbols).format(rounded)
             }
+            return "$signStr$formatted"
         }
     }
 
@@ -104,16 +110,19 @@ object PriceFormatter {
     }
 
     fun formatRawDecimal(value: Double): String {
-        if (value.isNaN() || value.isInfinite() || value <= 0.0) return "0"
-        return if (value >= 1.0) {
-            if (value % 1.0 == 0.0) {
-                value.toLong().toString()
+        if (value.isNaN() || value.isInfinite() || value == 0.0) return "0"
+        val isNegative = value < 0
+        val absVal = abs(value)
+        val formatted = if (absVal >= 1.0) {
+            if (absVal % 1.0 == 0.0) {
+                absVal.toLong().toString()
             } else {
-                String.format(Locale.US, "%.4f", value).trimEnd('0').trimEnd('.')
+                String.format(Locale.US, "%.4f", absVal).trimEnd('0').trimEnd('.')
             }
         } else {
-            String.format(Locale.US, "%.8f", value).trimEnd('0').trimEnd('.')
+            String.format(Locale.US, "%.8f", absVal).trimEnd('0').trimEnd('.')
         }
+        return if (isNegative) "-$formatted" else formatted
     }
 
     fun formatQuantity(quantity: Double): String {

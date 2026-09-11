@@ -43,24 +43,24 @@ val DarkAppColors = AppColors(
     orange = Color(0xFFFF9800)
 )
 
-/** Light: clean neutral off-white canvas with warm gold and emerald accents, no blue. */
+/** Light: clean neutral off-white canvas with high-contrast dark amber/gold and emerald accents. */
 val LightAppColors = AppColors(
-    background = Color(0xFFF5F6F8),
+    background = Color(0xFFF4F5F7),
     surface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFFF0F2F5),
+    surfaceVariant = Color(0xFFE2E8F0),
     cardBackground = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF14171A),
-    textSecondary = Color(0xFF5E6773),
-    textMuted = Color(0xFF8B94A0),
-    border = Color(0xFFE2E5E9),
-    green = Color(0xFF03A66D),
-    greenLight = Color(0xFF0ECB81),
-    red = Color(0xFFCF304A),
-    redLight = Color(0xFFF6465D),
-    blue = Color(0xFFDDA200), // Gold accent
-    blueSoft = Color(0xFFF0B90B),
-    amber = Color(0xFFDDA200),
-    orange = Color(0xFFE65100)
+    textPrimary = Color(0xFF0F172A),
+    textSecondary = Color(0xFF334155),
+    textMuted = Color(0xFF64748B),
+    border = Color(0xFFCBD5E1),
+    green = Color(0xFF047857),
+    greenLight = Color(0xFF059669),
+    red = Color(0xFFB91C1C),
+    redLight = Color(0xFFDC2626),
+    blue = Color(0xFFB45309), // Tokocrypto Dark Amber/Gold (High-contrast on light background)
+    blueSoft = Color(0xFFD97706),
+    amber = Color(0xFFB45309),
+    orange = Color(0xFFC2410C)
 )
 
 val LocalAppColors = staticCompositionLocalOf { DarkAppColors }

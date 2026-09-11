@@ -202,7 +202,7 @@ class AppPreferences(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, value).apply()
 
     var isRealSimSyncEnabled: Boolean
-        get() = prefs.getBoolean(KEY_REAL_SIM_SYNC_ENABLED, true)
+        get() = false
         set(value) = prefs.edit().putBoolean(KEY_REAL_SIM_SYNC_ENABLED, value).apply()
 
     var priceFeedThrottleMs: Long

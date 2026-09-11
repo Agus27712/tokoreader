@@ -177,6 +177,7 @@ class TokocryptoMarketWebSocket(
         override fun onOpen(webSocket: WebSocket, response: Response) {
             reconnectAttempt = 0
             lastMessageAt.set(System.currentTimeMillis())
+            com.tkc.screener.util.DebugLogManager.logConnection("WebSocket", "Terhubung ke live stream Tokocrypto: $streamSymbol")
             onConnected()
         }
 
@@ -184,12 +185,14 @@ class TokocryptoMarketWebSocket(
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             if (socket === webSocket) socket = null
+            com.tkc.screener.util.DebugLogManager.logConnection("WebSocket", "Koneksi terputus/gagal ($streamSymbol): ${t.localizedMessage}")
             onDisconnected()
             reconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             if (socket === webSocket) socket = null
+            com.tkc.screener.util.DebugLogManager.logConnection("WebSocket", "Koneksi ditutup ($code/$reason) untuk stream: $streamSymbol")
             onDisconnected()
             if (code != 1000) reconnect()
         }
