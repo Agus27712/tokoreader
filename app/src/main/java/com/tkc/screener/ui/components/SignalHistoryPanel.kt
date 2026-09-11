@@ -119,8 +119,9 @@ fun SignalHistoryPanel(
                         fontWeight = FontWeight.Bold,
                         color = TvTextPrimary
                     )
+                    val panelQuote = PriceFormatter.quoteFromSymbol(currentSymbol)
                     if (position.isHolding && position.entryPrice > 0.0) {
-                        Text("Harga beli: ${PriceFormatter.formatPrice(position.entryPrice)}", fontSize = 9.sp, color = TvTextSecondary)
+                        Text("Harga beli: ${PriceFormatter.formatPrice(position.entryPrice, quoteAsset = panelQuote)}", fontSize = 9.sp, color = TvTextSecondary)
                     }
                 }
                 Text(ownershipLabel, fontSize = 10.sp, fontWeight = FontWeight.Black, color = ownershipColor)
@@ -174,8 +175,9 @@ fun SignalHistoryPanel(
                                     }
                                     Spacer(Modifier.width(10.dp))
                                     Column {
+                                        val sigQuote = PriceFormatter.quoteFromSymbol(signal.marketSymbol.ifBlank { currentSymbol })
                                         Text(currentSymbol, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = color)
-                                        Text("Entry ${PriceFormatter.formatPrice(signal.entryPrice)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TvTextPrimary)
+                                        Text("Entry ${PriceFormatter.formatPrice(signal.entryPrice, quoteAsset = sigQuote)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = TvTextPrimary)
                                     }
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
@@ -184,10 +186,11 @@ fun SignalHistoryPanel(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
+                            val sigQuote = PriceFormatter.quoteFromSymbol(signal.marketSymbol.ifBlank { currentSymbol })
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                PriceBox("TP1", signal.targetPrice1, TvGreen, Modifier.weight(1f))
-                                PriceBox("TP2", signal.targetPrice2, TvGreen, Modifier.weight(1f))
-                                PriceBox("SL", signal.stopLoss, TvRed, Modifier.weight(1f))
+                                PriceBox("TP1", signal.targetPrice1, TvGreen, sigQuote, Modifier.weight(1f))
+                                PriceBox("TP2", signal.targetPrice2, TvGreen, sigQuote, Modifier.weight(1f))
+                                PriceBox("SL", signal.stopLoss, TvRed, sigQuote, Modifier.weight(1f))
                             }
                             Spacer(Modifier.height(7.dp))
                             Row(
@@ -248,9 +251,9 @@ private fun HistorySummary(label: String, count: Int, color: Color, modifier: Mo
 }
 
 @Composable
-private fun PriceBox(label: String, value: Double, color: Color, modifier: Modifier = Modifier) {
+private fun PriceBox(label: String, value: Double, color: Color, quoteAsset: String = "IDR", modifier: Modifier = Modifier) {
     Column(modifier.clip(RoundedCornerShape(7.dp)).background(color.copy(alpha = 0.08f)).padding(horizontal = 6.dp, vertical = 5.dp)) {
         Text(label, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = color)
-        Text(if (value > 0) PriceFormatter.formatPrice(value) else "-", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TvTextPrimary, maxLines = 1)
+        Text(if (value > 0) PriceFormatter.formatPrice(value, quoteAsset = quoteAsset) else "-", fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = TvTextPrimary, maxLines = 1)
     }
 }

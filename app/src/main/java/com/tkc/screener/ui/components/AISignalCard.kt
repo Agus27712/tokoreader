@@ -170,11 +170,12 @@ fun AISignalCard(
             Spacer(Modifier.height(10.dp))
             LinearProgressIndicator(progress = { (signal.confidence / 100.0f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)), color = actionColor, trackColor = TvBorder)
             Spacer(Modifier.height(14.dp))
+            val quoteAsset = PriceFormatter.quoteFromSymbol(signal.marketSymbol)
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                LevelRow("ENTRY / MASUK", formatLevel(signal.entryPrice), TvTextPrimary)
-                LevelRow("TP1 • 2× ATR", formatLevel(signal.targetPrice1), TvGreen)
-                LevelRow("TP2 • 3,5× ATR", formatLevel(signal.targetPrice2), TvGreen)
-                LevelRow("STOP LOSS • 1,5× ATR", formatLevel(signal.stopLoss), TvRed)
+                LevelRow("ENTRY / MASUK", formatLevel(signal.entryPrice, quoteAsset), TvTextPrimary)
+                LevelRow("TP1 • 2× ATR", formatLevel(signal.targetPrice1, quoteAsset), TvGreen)
+                LevelRow("TP2 • 3,5× ATR", formatLevel(signal.targetPrice2, quoteAsset), TvGreen)
+                LevelRow("STOP LOSS • 1,5× ATR", formatLevel(signal.stopLoss, quoteAsset), TvRed)
                 LevelRow("R:R MATEMATIS", signal.riskRewardRatio, TvTextPrimary)
             }
             Spacer(Modifier.height(10.dp))
@@ -244,7 +245,8 @@ private fun LearningFactorRow(title: String, value: String, lesson: String) {
     }
 }
 
-private fun formatLevel(value: Double): String = if (value > 0.0 && value.isFinite()) PriceFormatter.formatPriceFull(value) else "Belum tersedia"
+private fun formatLevel(value: Double, quoteAsset: String = "IDR"): String =
+    if (value > 0.0 && value.isFinite()) PriceFormatter.formatPriceFull(value, quoteAsset = quoteAsset) else "Belum tersedia"
 
 @Composable
 private fun LevelRow(label: String, value: String, color: Color) {

@@ -56,6 +56,7 @@ jobs:
         run: |
           mkdir -p release-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/tokoreader-update.apk
+          ls -la release-artifacts/
           echo "APK built successfully"
 
       - name: Generate Release Notes

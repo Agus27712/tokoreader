@@ -39,7 +39,7 @@ android {
     buildConfigField("String", "GROQ_API_KEY", "\"${getSecret("GROQ_API_KEY")}\"")
   }
   signingConfigs {
-    create("debugConfig") {
+    getByName("debug") {
       val ksFile = file("${rootDir}/debug.keystore")
       if (!ksFile.exists()) {
         val b64File = file("${rootDir}/debug.keystore.base64")
@@ -52,10 +52,12 @@ android {
           }
         }
       }
-      storeFile = ksFile
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      if (ksFile.exists()) {
+        storeFile = ksFile
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
     create("release") {
       val storePassword = System.getenv("RELEASE_STORE_PASSWORD")
@@ -95,7 +97,7 @@ android {
     debug {
       isMinifyEnabled = false
       val hasReleaseKeys = !System.getenv("RELEASE_KEYSTORE_BASE64").isNullOrBlank() || !System.getenv("RELEASE_KEYSTORE_PATH").isNullOrBlank()
-      signingConfig = if (hasReleaseKeys) signingConfigs.getByName("release") else signingConfigs.getByName("debugConfig")
+      signingConfig = if (hasReleaseKeys) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
     }
   }
   compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

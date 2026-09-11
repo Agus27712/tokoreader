@@ -76,12 +76,14 @@ class TokocryptoMarketWebSocket(
     }
 
     private val wsDomains = listOf(
+        "data-stream.binance.vision:443",
+        "stream.binance.com:443",
+        "data-stream.binance.vision",
+        "stream1.binance.com:443",
+        "stream2.binance.com:443",
+        "stream3.binance.com:443",
         "stream.binance.com:9443",
-        "stream1.binance.com:9443",
-        "stream2.binance.com:9443",
-        "stream3.binance.com:9443",
-        "stream4.binance.com:9443",
-        "stream.binance.com:443"
+        "stream1.binance.com:9443"
     )
 
     private fun connect() {

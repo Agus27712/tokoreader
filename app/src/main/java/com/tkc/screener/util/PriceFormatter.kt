@@ -7,6 +7,15 @@ import kotlin.math.abs
 
 object PriceFormatter {
 
+    /** Ambil quote asset ("USDT" / "IDR") secara otomatis dari string simbol (misal "BTCUSDT", "BTC/USDT", "BTCIDR") */
+    fun quoteFromSymbol(symbol: String): String {
+        val s = symbol.uppercase()
+        return when {
+            s.endsWith("USDT") || s.endsWith("USD") || s.endsWith("USDC") -> "USDT"
+            else -> "IDR"
+        }
+    }
+
     /** Format harga dengan simbol mata uang dinamis (IDR / USDT / BIDR / USD) */
     fun formatPrice(price: Double, showSymbol: Boolean = true, quoteAsset: String = "IDR"): String {
         if (price.isNaN() || price.isInfinite() || price == 0.0) {
