@@ -1,0 +1,552 @@
+package com.tkc.screener.ui.screens
+
+import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CropRotate
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tkc.screener.config.AiProvider
+import com.tkc.screener.config.MarketDataSource
+import com.tkc.screener.engine.MarketStructureAnalyzer
+import com.tkc.screener.engine.MarketStructureSnapshot
+import com.tkc.screener.model.*
+import com.tkc.screener.ui.components.SimpleComposeChart
+import com.tkc.screener.ui.components.detail.*
+import com.tkc.screener.ui.theme.*
+import com.tkc.screener.util.AppPreferences
+import com.tkc.screener.util.HapticUtil
+import com.tkc.screener.viewmodel.*
+
+@Composable
+fun DetailChartScreen(
+    viewModel: TradingViewModel,
+    onNavigateToDashboard: () -> Unit,
+    onOpenLandscapeChart: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val marketDataSource by viewModel.marketDataSource.collectAsStateWithLifecycle()
+    val pair by viewModel.selectedPair.collectAsStateWithLifecycle()
+    val tick by viewModel.currentTick.collectAsStateWithLifecycle()
+    val candles by viewModel.recentCandles.collectAsStateWithLifecycle()
+    val indicators by viewModel.currentIndicators.collectAsStateWithLifecycle()
+    val signal by viewModel.aiSignalState.collectAsStateWithLifecycle()
+    val connection by viewModel.connectionState.collectAsStateWithLifecycle()
+    val isScalping by viewModel.isScalpingMode.collectAsStateWithLifecycle()
+    val strategyMode by viewModel.strategyMode.collectAsStateWithLifecycle()
+    val tradingFees by viewModel.tradingFees.collectAsStateWithLifecycle()
+    val isRealBuyMode by viewModel.isRealBuyMode.collectAsStateWithLifecycle()
+    val watchlist by viewModel.watchlist.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val spotPosition by viewModel.spotPosition.collectAsStateWithLifecycle()
+    val sellSignalState by viewModel.sellSignalState.collectAsStateWithLifecycle()
+    val positionContext by viewModel.positionContext.collectAsStateWithLifecycle()
+    val tradingWorkflow by viewModel.tradingWorkflow.collectAsStateWithLifecycle()
+    val selectedTimeframe by viewModel.selectedTimeframe.collectAsStateWithLifecycle()
+    val aiGroq by viewModel.auditReportText.collectAsStateWithLifecycle()
+    val aiGemini by viewModel.geminiSummaryText.collectAsStateWithLifecycle()
+    val aiLoadingGroq by viewModel.isAuditLoading.collectAsStateWithLifecycle()
+    val aiLoadingGemini by viewModel.isGeminiLoading.collectAsStateWithLifecycle()
+    val wallet by viewModel.simulationWallet.collectAsStateWithLifecycle()
+    val realBalance by viewModel.realTokocryptoBalance.collectAsStateWithLifecycle()
+    val realAvgBuyPrices by viewModel.realAvgBuyPrices.collectAsStateWithLifecycle()
+    val priceAlerts by viewModel.priceAlerts.collectAsStateWithLifecycle()
+    val mtfStateAll by viewModel.mtfState.collectAsStateWithLifecycle()
+    val globalContext by viewModel.globalContext.collectAsStateWithLifecycle()
+    val orderBookBids by viewModel.orderBookBids.collectAsStateWithLifecycle()
+    val orderBookAsks by viewModel.orderBookAsks.collectAsStateWithLifecycle()
+    val mtfState = remember(mtfStateAll, pair.symbol) { mtfStateAll[pair.symbol] ?: emptyMap() }
+
+    var showPriceAlertDialog by remember { mutableStateOf(false) }
+    var showAiAssistantDialog by remember { mutableStateOf(false) }
+    var showShieldDialog by remember { mutableStateOf(false) }
+    val marketStructure = remember(candles) { MarketStructureAnalyzer.analyze(candles) }
+    val isFavorite = favorites.contains(pair.symbol.uppercase()) || favorites.contains(pair.symbol)
+    val provider = remember { AppPreferences(context).aiProvider }
+    val isConnected = connection is MarketConnectionState.Connected
+    val isHolding = positionContext.hasPosition || (spotPosition != null && spotPosition!!.isHolding)
+    var isBuyMode by remember(pair.symbol) { mutableStateOf(!isHolding) }
+
+    // Dialogs
+    DisposableEffect(pair.baseAsset) {
+        if (pair.baseAsset.isNotBlank()) {
+            com.tkc.screener.engine.global.GlobalContextManager.subscribeCoin(pair.baseAsset)
+        }
+        onDispose {
+            com.tkc.screener.engine.global.GlobalContextManager.stop()
+        }
+    }
+
+    if (showShieldDialog) {
+        GlobalMarketShieldDialog(
+            context = globalContext,
+            symbol = pair.symbol,
+            baseAsset = pair.baseAsset,
+            isFavorite = isFavorite,
+            bids = orderBookBids,
+            asks = orderBookAsks,
+            strategyMode = strategyMode,
+            onDismiss = { showShieldDialog = false }
+        )
+    }
+
+    var lastKnownLivePrice by remember(pair.symbol) { mutableDoubleStateOf(0.0) }
+    LaunchedEffect(tick?.price) {
+        val p = tick?.price ?: 0.0
+        if (p > 0.0 && p.isFinite()) {
+            lastKnownLivePrice = p
+        }
+    }
+
+    // 1. Hanya depend ke tick.price live, JANGAN ke candles
+    val lastMarketPrice = tick?.price?.takeIf { it > 0.0 && it.isFinite() }
+        ?: lastKnownLivePrice.takeIf { it > 0.0 }
+        ?: 0.0
+
+    // 2. Fallback emergency terpisah: hanya jika live tick belum pernah ada sama sekali saat cold start
+    val displayPrice = if (lastMarketPrice > 0.0) {
+        lastMarketPrice
+    } else {
+        candles.lastOrNull()?.close?.takeIf { it > 0.0 && it.isFinite() } ?: 0.0
+    }
+
+    val effectivePositionContext = remember(positionContext, displayPrice, spotPosition, pair, tradingFees, isRealBuyMode) {
+        if (displayPrice > 0.0) {
+            val holding = viewModel.getHoldingStatus(pair, isRealBuyMode)
+            PositionContext.create(
+                symbol = pair.symbol,
+                spotPosition = spotPosition,
+                holdingStatus = holding,
+                currentPrice = displayPrice,
+                fees = tradingFees
+            )
+        } else {
+            positionContext
+        }
+    }
+
+    if (showPriceAlertDialog) {
+        PriceAlertDialog(
+            symbol = pair.symbol,
+            currentPrice = displayPrice,
+            quoteAsset = pair.quoteAsset,
+            alerts = priceAlerts,
+            onAddAlert = { alert ->
+                viewModel.addPriceAlert(alert)
+                HapticUtil.vibrateTradeSuccess(context)
+                android.widget.Toast.makeText(context, "Alert tersimpan!", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onRemoveAlert = { id ->
+                viewModel.removePriceAlert(id)
+                android.widget.Toast.makeText(context, "Alert dihapus", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onToggleAlert = { id -> viewModel.togglePriceAlert(id) },
+            onDismiss = { showPriceAlertDialog = false }
+        )
+    }
+
+    if (showAiAssistantDialog) {
+        val isAiLoading = aiLoadingGroq || aiLoadingGemini
+        val aiSignalText = if (provider == AiProvider.GROQ) aiGroq ?: "" else aiGemini ?: ""
+
+        AiAssistantDialog(
+            aiSignal = aiSignalText,
+            isLoading = isAiLoading,
+            provider = provider,
+            onDismiss = { showAiAssistantDialog = false },
+            onAnalyze = {
+                if (provider == AiProvider.GROQ) {
+                    viewModel.requestDeepAiAudit()
+                } else {
+                    viewModel.requestGeminiChartSummary()
+                }
+            }
+        )
+    }
+
+    val volume = tick?.volume24h ?: 0.0
+    val change = remember(tick?.change24h) {
+        val tc = tick?.change24h ?: 0.0
+        if (!tc.isNaN()) tc else 0.0
+    }
+    val isUsdt = pair.quoteAsset.equals("USDT", true) || pair.quoteAsset.equals("USD", true)
+    val activityText = remember(isUsdt, volume, change) {
+        if (isUsdt) {
+            when {
+                volume >= 100_000_000.0 || change >= 3.0 -> "Aktivitas tinggi"
+                volume >= 5_000_000.0 || change >= 0.0 -> "Aktivitas sedang"
+                else -> "Aktivitas rendah"
+            }
+        } else {
+            when {
+                volume >= 50_000_000_000 || change >= 3.0 -> "Aktivitas tinggi"
+                volume >= 1_000_000_000 || change >= 0.0 -> "Aktivitas sedang"
+                else -> "Aktivitas rendah"
+            }
+        }
+    }
+    val activityColor = when (activityText) {
+        "Aktivitas tinggi" -> TvGreen
+        "Aktivitas sedang" -> TvAmber
+        else -> TvTextSecondary
+    }
+
+    // Balances Calculation
+    val isUsdtQuote = pair.quoteAsset.uppercase() == "USDT"
+    val availableIdr = if (isRealBuyMode) {
+        if (isUsdtQuote) (realBalance["usdt"] ?: 0.0) else ((realBalance["idr"] ?: 0.0) + (realBalance["bidr"] ?: 0.0))
+    } else {
+        if (isUsdtQuote) wallet.getAvailableUsdt() else wallet.getAvailableIdr()
+    }
+    val availableCoin = if (isRealBuyMode) {
+        realBalance[pair.baseAsset.lowercase()] ?: realBalance[pair.baseAsset.uppercase()] ?: 0.0
+    } else wallet.getAvailableCoin(pair.baseAsset)
+    val realApiAvg = realAvgBuyPrices[pair.baseAsset.lowercase()] ?: realAvgBuyPrices[pair.baseAsset.uppercase()] ?: 0.0
+    val simApiAvg = wallet.avgBuyPrices[pair.baseAsset.uppercase()] ?: 0.0
+    val avgBuyPrice = if (isRealBuyMode) {
+        if (realApiAvg > 0.0) realApiAvg else spotPosition.entryPrice
+    } else {
+        if (simApiAvg > 0.0) simApiAvg else spotPosition.entryPrice
+    }
+
+    val scrollState = rememberScrollState()
+    val isScrolled by remember { derivedStateOf { scrollState.value > 140 } }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(TvBackground)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            // 1. Top Bar
+            DetailTopBar(
+                pair = pair,
+                onNavigateToDashboard = onNavigateToDashboard,
+                isConnected = isConnected
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // 2 & 3. Hero Ambient Header (Price & Controls)
+            val totalBids = remember(orderBookBids) { orderBookBids.sumOf { it.amount } }
+            val totalAsks = remember(orderBookAsks) { orderBookAsks.sumOf { it.amount } }
+            val buyRatio = remember(totalBids, totalAsks) {
+                if (totalBids + totalAsks > 0) totalBids / (totalBids + totalAsks) else 0.5
+            }
+
+            val ambientColor: androidx.compose.ui.graphics.Color
+            val watermarkIcon: androidx.compose.ui.graphics.vector.ImageVector
+            when {
+                totalBids + totalAsks == 0.0 -> {
+                    ambientColor = TvBlue
+                    watermarkIcon = Icons.Default.Security
+                }
+                buyRatio >= 0.58 -> {
+                    ambientColor = TvGreen
+                    watermarkIcon = Icons.Default.Security
+                }
+                buyRatio <= 0.42 -> {
+                    ambientColor = TvRed
+                    watermarkIcon = Icons.Default.Warning
+                }
+                else -> {
+                    ambientColor = TvBlue
+                    watermarkIcon = Icons.Default.Security
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(
+                                ambientColor.copy(alpha = 0.26f),
+                                ambientColor.copy(alpha = 0.12f)
+                            )
+                        )
+                    )
+                    .border(1.dp, ambientColor.copy(alpha = 0.38f), androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .padding(14.dp)
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = watermarkIcon,
+                    contentDescription = null,
+                    tint = ambientColor.copy(alpha = 0.12f),
+                    modifier = Modifier
+                        .size(110.dp)
+                        .align(Alignment.Center)
+                )
+                
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    DetailPriceHeader(
+                        price = displayPrice,
+                        change24h = change,
+                        activityText = activityText,
+                        activityColor = activityColor,
+                        quoteAsset = pair.quoteAsset,
+                        baseAsset = pair.baseAsset,
+                        symbol = pair.symbol,
+                        isFavorite = isFavorite,
+                        globalContext = globalContext,
+                        orderBookBids = orderBookBids,
+                        orderBookAsks = orderBookAsks,
+                        strategyMode = strategyMode,
+                        onOpenShieldInfo = { showShieldDialog = true },
+                        isBuyMode = isBuyMode,
+                        onBuyModeChanged = {
+                            isBuyMode = it
+                            HapticUtil.vibrateTick(context)
+                        }
+                    )
+
+                    Spacer(Modifier.height(14.dp))
+
+                    DetailControlsRow(
+                        selectedTimeframe = selectedTimeframe,
+                        onSelectTimeframe = { viewModel.selectTimeframe(it) },
+                        priceAlerts = priceAlerts,
+                        isFavorite = isFavorite,
+                        onOpenAlerts = { showPriceAlertDialog = true },
+                        onOpenPortfolio = { viewModel.openPortfolio() },
+                        onOpenAiAssistant = { showAiAssistantDialog = true },
+                        onOpenSimulation = { viewModel.openSimulation(pair) },
+                        onOpenLearning = { viewModel.openLearning() },
+                        onToggleFavorite = {
+                            viewModel.toggleFavorite(pair.symbol)
+                            HapticUtil.vibrateTick(context)
+                        }
+                    )
+                    
+                    Spacer(Modifier.height(14.dp))
+
+                    // 4. Chart Preview & Landscape Launcher
+                    DetailChartSection(
+                        candles = candles,
+                        tick = tick,
+                        signal = signal,
+                        pair = pair,
+                        selectedTimeframe = selectedTimeframe,
+                        onOpenLandscapeChart = onOpenLandscapeChart
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // 5. Radar Card & Transaction Section
+            WaitingEntryRadarCard(
+                signal = signal,
+                strategyMode = strategyMode,
+                scalping = isScalping,
+                fees = tradingFees,
+                currentPrice = displayPrice,
+                baseAsset = pair.baseAsset,
+                quoteAsset = pair.quoteAsset,
+                availableIdr = availableIdr,
+                availableCoin = availableCoin,
+                avgBuyPrice = avgBuyPrice,
+                isRealBuyMode = isRealBuyMode,
+                isBuyMode = isBuyMode,
+                onBuyModeChanged = { isBuyMode = it },
+                onExecuteBuy = { nominalIdr, customBuyPrice, tp1Price, tp2Price ->
+                    val execPrice = if (customBuyPrice > 0.0) customBuyPrice else if (displayPrice > 0.0) displayPrice else signal.entryPrice
+                    if (execPrice > 0) {
+                        if (isRealBuyMode) {
+                            viewModel.executeRealTrade(pair.symbol, "buy", execPrice.toLong(), nominalIdr, tp1Price, tp2Price) { success, msg ->
+                                if (success) HapticUtil.vibrateTradeSuccess(context)
+                                else HapticUtil.vibrateTradeFailure(context)
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        } else {
+                            val qty = nominalIdr / execPrice
+                            val orderType = if (displayPrice > 0.0 && execPrice < displayPrice) {
+                                com.tkc.screener.trading.SimulationOrderType.LIMIT
+                            } else {
+                                com.tkc.screener.trading.SimulationOrderType.MARKET
+                            }
+                            val res = viewModel.submitSimulationOrder(
+                                side = com.tkc.screener.trading.SimulationOrderSide.BUY,
+                                type = orderType,
+                                price = execPrice,
+                                quantity = qty
+                            )
+                            val isSuccess = res is com.tkc.screener.trading.SimulationOrderResult.Success
+                            val msg = when (res) {
+                                is com.tkc.screener.trading.SimulationOrderResult.Success -> res.message
+                                is com.tkc.screener.trading.SimulationOrderResult.Error -> res.message
+                            }
+                            if (orderType == com.tkc.screener.trading.SimulationOrderType.MARKET) {
+                                viewModel.setOwnership(true, execPrice, quantity = qty, invested = nominalIdr, isReal = false)
+                            }
+                            if (isSuccess) HapticUtil.vibrateTradeSuccess(context)
+                            else HapticUtil.vibrateTradeFailure(context)
+                            android.widget.Toast.makeText(context, "Simulasi: $msg", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        HapticUtil.vibrateTradeFailure(context)
+                        android.widget.Toast.makeText(context, "Harga belum tersedia.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onExecuteSell = { sellQty, isAutoSell, tp1P, tp1Pct, tp2P, tp2Pct ->
+                    val execPrice = if (displayPrice > 0.0) displayPrice else signal.targetPrice1
+                    if (execPrice > 0) {
+                        viewModel.executeSellOrders(
+                            pair = pair,
+                            sellQty = sellQty,
+                            marketPrice = execPrice,
+                            isAutoTpEnabled = isAutoSell,
+                            tp1Price = tp1P,
+                            tp1Percent = tp1Pct,
+                            tp2Price = tp2P,
+                            tp2Percent = tp2Pct,
+                            isRealMode = isRealBuyMode
+                        ) { success, msg ->
+                            if (success) HapticUtil.vibrateTradeSuccess(context)
+                            else HapticUtil.vibrateTradeFailure(context)
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        HapticUtil.vibrateTradeFailure(context)
+                        android.widget.Toast.makeText(context, "Harga belum tersedia.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onSetManualBuyPrice = { entryPrice, investedAmount ->
+                    viewModel.setManualPositionPrice(pair.symbol, entryPrice, investedAmount, isReal = isRealBuyMode)
+                    HapticUtil.vibrateTradeSuccess(context)
+                    android.widget.Toast.makeText(context, "Harga beli manual tersimpan!", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                spotPosition = spotPosition,
+                sellSignalState = sellSignalState,
+                positionContext = effectivePositionContext,
+                workflow = tradingWorkflow,
+                onSetTrailingStop = { enabled, pct ->
+                    viewModel.setTrailingStop(enabled, pct)
+                    HapticUtil.vibrateTradeSuccess(context)
+                    android.widget.Toast.makeText(
+                        context,
+                        if (enabled) "Trailing $pct% aktif" else "Trailing off",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                },
+                onResetTrailingTrigger = { viewModel.resetTrailingTrigger() },
+                onSetAutoSellParams = { enabled, tp1Price, tp1Percent, tp2Price, tp2Percent ->
+                    viewModel.setAutoSellParams(enabled, tp1Price, tp1Percent, tp2Price, tp2Percent) { success, msg ->
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                    HapticUtil.vibrateTradeSuccess(context)
+                },
+                onDeployTrailingOrder = {
+                    viewModel.deployTrailingOrder(pair.symbol)
+                    HapticUtil.vibrateTradeSuccess(context)
+                    android.widget.Toast.makeText(context, "Trailing Aktif!", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onCancelTrailingOrder = {
+                    viewModel.cancelTrailingOrder(pair.symbol)
+                    HapticUtil.vibrateTradeSuccess(context)
+                    android.widget.Toast.makeText(context, "Trailing Dimatikan", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // 6. Market Condition Card
+            MarketConditionCard(
+                structure = marketStructure,
+                indicators = indicators,
+                signal = signal,
+                strategyMode = strategyMode,
+                scalping = isScalping,
+                onRetry = { viewModel.retryConnection() },
+                mtfState = mtfState
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // 6.1 Detail Indikator & Observasi
+            DetailTechnicalDetailsSection(
+                indicators = indicators,
+                structure = marketStructure,
+                volume24h = volume,
+                scalping = isScalping,
+                signal = signal,
+                price = displayPrice,
+                quoteAsset = pair.quoteAsset
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            // 7. Bottom Actions
+            DetailBottomActions(
+                marketDataSource = marketDataSource,
+                onOpenPortfolio = { viewModel.openPortfolio() },
+                onOpenExchange = { openExchange(context, marketDataSource) }
+            )
+
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Floating Sticky Status Bar
+        AnimatedVisibility(
+            visible = isScrolled,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
+            exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { -it },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            StickyFloatingStatusBar(
+                connection = connection,
+                strategyMode = strategyMode,
+                onRetry = { viewModel.retryConnection() }
+            )
+        }
+    }
+}
+

@@ -1,0 +1,224 @@
+package com.tkc.screener.util
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import com.tkc.screener.MainActivity
+import com.tkc.screener.config.StrategyMode
+import com.tkc.screener.model.AISignalState
+import com.tkc.screener.model.LifecycleState
+import com.tkc.screener.util.PriceFormatter
+
+object AlertNotificationHelper {
+    const val CHANNEL_ID = "channel_agu_trading_alerts"
+    const val CHANNEL_NAME = "Trading & Price Alerts"
+    const val CHANNEL_DESC = "Notifikasi harga target, sinyal strategi, dan trailing stop loss"
+
+    fun createNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+                description = CHANNEL_DESC
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 150, 250)
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    fun sendPriceAlertNotification(
+        context: Context,
+        notificationId: Int,
+        title: String,
+        message: String,
+        symbol: String = "",
+        onlyWhenBackground: Boolean = false
+    ) {
+        if (onlyWhenBackground && com.tkc.screener.AppContextProvider.isAppInForeground) {
+            timber.log.Timber.d("sendPriceAlertNotification: Diabaikan karena aplikasi aktif di foreground: $title")
+            return
+        }
+        val prefs = AppPreferences(context)
+        if (!prefs.isNotificationsEnabled) return
+
+        createNotificationChannel(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EXTRA_SYMBOL", symbol)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(com.tkc.screener.R.drawable.ic_stat_trading)
+            .setContentTitle(title)
+            .setContentText(message.substringBefore("\n"))
+            .setSubText(if (symbol.isNotBlank()) symbol.uppercase() else "Tokocrypto")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+        try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.notify(notificationId, builder.build())
+        } catch (_: SecurityException) {
+            // Permission not granted on Android 13+
+        }
+    }
+
+    fun sendCandidateFoundNotification(
+        context: Context,
+        symbol: String,
+        strategyMode: StrategyMode,
+        signal: AISignalState
+    ) {
+        if (com.tkc.screener.AppContextProvider.isAppInForeground) {
+            timber.log.Timber.d("sendCandidateFoundNotification: Diabaikan karena aplikasi aktif di foreground: $symbol")
+            return
+        }
+        val prefs = AppPreferences(context)
+        if (!prefs.isNotificationsEnabled) return
+
+        createNotificationChannel(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EXTRA_SYMBOL", symbol)
+        }
+
+        val notificationId = (symbol.uppercase().hashCode() xor (strategyMode.name.hashCode() * 31)) and 0x7FFFFFFF
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val modeLabel = when (strategyMode) {
+            StrategyMode.SCALPING -> "Scalping"
+            StrategyMode.SECOND_WAVE -> "Second-Wave"
+            StrategyMode.SWING -> "Swing"
+            StrategyMode.OFFICE_DAILY -> "Office Daily"
+            StrategyMode.TRENCHING -> "Trenching"
+        }
+
+        val stateLabel = if (signal.lifecycleState == LifecycleState.READY) "SIAP ENTRY" else "Kandidat Terdeteksi"
+        val title = "⚡ Kandidat $modeLabel: ${symbol.uppercase()}"
+
+        val priceStr = if (signal.entryPrice > 0.0) "Rp ${PriceFormatter.formatIdrNumber(signal.entryPrice)}" else "-"
+        val tp1Str = if (signal.targetPrice1 > 0.0) "Rp ${PriceFormatter.formatIdrNumber(signal.targetPrice1)}" else "-"
+        val slStr = if (signal.stopLoss > 0.0) "Rp ${PriceFormatter.formatIdrNumber(signal.stopLoss)}" else "-"
+
+        val reasonStr = signal.reasoning.firstOrNull() ?: signal.sentiment.displayName
+        val message = "Status: $stateLabel (Confidence: ${signal.confidence}%)\n" +
+                "Entry: $priceStr | TP1: $tp1Str | SL: $slStr\n" +
+                "Analisa: $reasonStr"
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(com.tkc.screener.R.drawable.ic_stat_trading)
+            .setContentTitle(title)
+            .setContentText("Status: $stateLabel • Conf: ${signal.confidence}% • Entry: $priceStr")
+            .setSubText(symbol.uppercase())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+        try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.notify(notificationId, builder.build())
+        } catch (_: SecurityException) {
+            // Permission not granted on Android 13+
+        }
+    }
+
+    fun sendTrailingHitNotification(
+        context: Context,
+        symbol: String,
+        entryPrice: Double,
+        peakPrice: Double,
+        currentPrice: Double,
+        limitSellPrice: Double,
+        quantity: Double,
+        isReal: Boolean
+    ) {
+        val prefs = AppPreferences(context)
+        if (!prefs.isNotificationsEnabled) return
+
+        createNotificationChannel(context)
+
+        // Main Intent (when tapped)
+        val mainIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EXTRA_SYMBOL", symbol)
+        }
+        val pendingMainIntent = PendingIntent.getActivity(
+            context,
+            (symbol.hashCode() and 0x7FFFFFFF) + 1000,
+            mainIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Action Intent (JUAL SEKARANG)
+        val actionIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            action = "com.tkc.screener.ACTION_EXECUTE_TRAILING_SELL"
+            putExtra("EXTRA_SYMBOL", symbol)
+            putExtra("EXTRA_LIMIT_PRICE", limitSellPrice)
+            putExtra("EXTRA_QUANTITY", quantity)
+            putExtra("EXTRA_IS_REAL", isReal)
+        }
+        val pendingActionIntent = PendingIntent.getActivity(
+            context,
+            (symbol.hashCode() and 0x7FFFFFFF) + 1001,
+            actionIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val profitPct = if (entryPrice > 0.0) ((limitSellPrice - entryPrice) / entryPrice) * 100.0 else 0.0
+        val formattedProfit = String.format(java.util.Locale.US, "%.2f%%", profitPct)
+        
+        val title = "🛡️ Trailing Profit Aktif • $symbol"
+        val message = "Keuntungan Terkunci: +$formattedProfit (Rp ${PriceFormatter.formatIdrNumber(limitSellPrice)})\nSaat ini: Rp ${PriceFormatter.formatIdrNumber(currentPrice)} | Modal: Rp ${PriceFormatter.formatIdrNumber(entryPrice)}"
+
+        val action = NotificationCompat.Action.Builder(
+            0,
+            "JUAL SEKARANG",
+            pendingActionIntent
+        ).build()
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(com.tkc.screener.R.drawable.ic_stat_trading)
+            .setContentTitle(title)
+            .setContentText("Terkunci: +$formattedProfit (Rp ${PriceFormatter.formatIdrNumber(limitSellPrice)})")
+            .setSubText("Trailing Stop")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(pendingMainIntent)
+            .addAction(action)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+        try {
+            val manager = NotificationManagerCompat.from(context)
+            manager.notify((symbol.hashCode() and 0x7FFFFFFF) + 1000, builder.build())
+        } catch (_: SecurityException) {}
+    }
+}

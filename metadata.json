@@ -1,0 +1,6 @@
+{
+  "name": "TKCScreener",
+  "description": "Tokocrypto real-time market data streaming with on-device AI signals, technical indicator analytics, and precision crypto price engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

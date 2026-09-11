@@ -1,0 +1,387 @@
+package com.tkc.screener.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tkc.screener.model.AppScreen
+import com.tkc.screener.model.TradingPair
+import com.tkc.screener.ui.components.dashboard.AppBottomNavigationBar
+import com.tkc.screener.ui.components.dashboard.NavTab
+import com.tkc.screener.ui.components.security.SecurityPinDialog
+import com.tkc.screener.ui.components.simulation.SimulationTopUpModal
+import com.tkc.screener.ui.screens.portfolio.HoldingItem
+import com.tkc.screener.ui.screens.portfolio.PortfolioTab
+import com.tkc.screener.ui.screens.portfolio.RealPortfolioView
+import com.tkc.screener.ui.screens.portfolio.SimulationPortfolioView
+import com.tkc.screener.database.RealOpenOrderEntity
+import com.tkc.screener.database.RealTradeEntity
+import com.tkc.screener.ui.theme.*
+import com.tkc.screener.viewmodel.*
+
+/**
+ * Screen Utama Portofolio (Coordinator):
+ * Memisahkan secara bersih antara Portofolio Simulasi dan Portofolio Real Tokocrypto.
+ */
+@Composable
+fun PortfolioScreen(
+    viewModel: TradingViewModel,
+    onNavigateToDetail: (TradingPair) -> Unit,
+    onNavigateToSimulation: (TradingPair) -> Unit,
+    onOpenSettings: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val wallet by viewModel.simulationWallet.collectAsStateWithLifecycle()
+    val history by viewModel.simulationHistory.collectAsStateWithLifecycle()
+    val openOrders by viewModel.simulationOpenOrders.collectAsStateWithLifecycle()
+    val dashboardTicks by viewModel.dashboardTicks.collectAsStateWithLifecycle()
+    val currentTick by viewModel.currentTick.collectAsStateWithLifecycle()
+    val selectedPair by viewModel.selectedPair.collectAsStateWithLifecycle()
+
+    val isRealBuyMode by viewModel.isRealBuyMode.collectAsStateWithLifecycle()
+    val isPinUnlocked by viewModel.isPinUnlocked.collectAsStateWithLifecycle()
+    val realBalance by viewModel.realTokocryptoBalance.collectAsStateWithLifecycle()
+    val realFreeBalance by viewModel.realFreeBalance.collectAsStateWithLifecycle()
+    val realLockedBalance by viewModel.realLockedBalance.collectAsStateWithLifecycle()
+    val realOpenOrders by viewModel.realOpenOrders.collectAsStateWithLifecycle()
+    val realTrades by viewModel.realTrades.collectAsStateWithLifecycle()
+    val realAvgBuyPrices by viewModel.realAvgBuyPrices.collectAsStateWithLifecycle()
+    val isFetchingRealBalance by viewModel.isFetchingRealBalance.collectAsStateWithLifecycle()
+    val realTradeStatus by viewModel.realTradeStatus.collectAsStateWithLifecycle()
+    val isRealSimSyncEnabled by viewModel.isRealSimSyncEnabled.collectAsStateWithLifecycle()
+
+    // Refresh saldo HANYA saat PIN baru unlock + belum ada cache saldo.
+    // Jangan spam API tiap buka tab Real / recompose.
+    LaunchedEffect(isPinUnlocked) {
+        if (isPinUnlocked && viewModel.hasRealCredentialsConfigured() && realBalance.isEmpty()) {
+            viewModel.fetchRealBalance()
+        }
+    }
+
+    var showRealPortfolioMode by remember(isRealBuyMode) { mutableStateOf(isRealBuyMode) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var pinDialogError by remember { mutableStateOf<String?>(null) }
+
+    var selectedTab by remember { mutableStateOf(PortfolioTab.HOLDINGS) }
+    var showTopUpModal by remember { mutableStateOf(false) }
+
+    val usdtRate = remember(dashboardTicks, currentTick) {
+        when {
+            currentTick?.symbol.equals("USDTIDR", ignoreCase = true) -> currentTick?.price ?: 16250.0
+            dashboardTicks.containsKey("USDTIDR") -> dashboardTicks["USDTIDR"]?.price ?: 16250.0
+            dashboardTicks.containsKey("usdt_idr") -> dashboardTicks["usdt_idr"]?.price ?: 16250.0
+            else -> 16250.0
+        }
+    }
+
+    // Hitung Koin Dimiliki Virtual Simulasi
+    val holdings = remember(wallet, dashboardTicks, currentTick) {
+        wallet.coinBalances.filter { it.value > 0.00000001 }.map { (baseAsset, qty) ->
+            val symbolIdr = "${baseAsset}IDR"
+            val symbolUsdt = "${baseAsset}USDT"
+            val price = when {
+                symbolIdr.equals(currentTick?.symbol, ignoreCase = true) -> currentTick?.price ?: 0.0
+                dashboardTicks.containsKey(symbolIdr) -> dashboardTicks[symbolIdr]?.price ?: 0.0
+                dashboardTicks.containsKey(symbolUsdt) -> (dashboardTicks[symbolUsdt]?.price ?: 0.0) * usdtRate
+                else -> 0.0
+            }
+            val avgPrice = wallet.avgBuyPrices[baseAsset] ?: 0.0
+            val effectivePrice = if (price > 0.0) price else avgPrice
+            val totalValue = qty * effectivePrice
+            val pnl = if (avgPrice > 0.0) (effectivePrice - avgPrice) * qty else 0.0
+            val pnlPct = if (avgPrice > 0.0) ((effectivePrice - avgPrice) / avgPrice) * 100.0 else 0.0
+
+            val pair = TradingPair.fromCustomSymbol(symbolIdr, "IDR")
+            HoldingItem(
+                baseAsset = baseAsset,
+                quantity = qty,
+                avgBuyPrice = avgPrice,
+                currentPrice = effectivePrice,
+                totalValueIdr = totalValue,
+                pnlIdr = pnl,
+                pnlPercent = pnlPct,
+                tradingPair = pair,
+                isRealMirror = false
+            )
+        }.sortedByDescending { it.totalValueIdr }
+    }
+
+    val totalCoinValueIdr = remember(holdings) { holdings.sumOf { it.totalValueIdr } }
+    val totalKasSimulasiIdr = remember(wallet.idrBalance, wallet.usdtBalance, usdtRate) {
+        wallet.idrBalance + (wallet.usdtBalance * usdtRate)
+    }
+    val totalPortfolioValueIdr = remember(totalKasSimulasiIdr, totalCoinValueIdr) { totalKasSimulasiIdr + totalCoinValueIdr }
+    val totalUnrealizedPnlIdr = remember(holdings) { holdings.sumOf { it.pnlIdr } }
+    val totalCostBasis = remember(holdings) { holdings.sumOf { it.quantity * it.avgBuyPrice } }
+    val totalUnrealizedPnlPct = remember(totalCostBasis, totalUnrealizedPnlIdr) {
+        if (totalCostBasis > 0.0) (totalUnrealizedPnlIdr / totalCostBasis) * 100.0 else 0.0
+    }
+    val displayHistory = history
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(TvBackground)
+    ) {
+        // TOP APP BAR
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TvBackground)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Kembali",
+                        tint = TvTextPrimary
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = "PORTOFOLIO SAYA",
+                        color = TvTextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        text = if (showRealPortfolioMode) "Aset Riil Tokocrypto Terhubung" else "Simulasi Akun & Manajemen Aset",
+                        color = TvTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (!showRealPortfolioMode) {
+                    IconButton(
+                        onClick = { showTopUpModal = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AddCircleOutline,
+                            contentDescription = "Top Up / Reset",
+                            tint = TvGreen
+                        )
+                    }
+                }
+            }
+        }
+
+        // SEGMENT SWITCHER: SIMULASI VS REAL TOKOCRYPTO
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TvBackground)
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(TvSurfaceVariant, RoundedCornerShape(10.dp))
+                    .padding(3.dp)
+            ) {
+                // Tab 1: SIMULASI
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (!showRealPortfolioMode) TvCardBackground else Color.Transparent)
+                        .clickable { showRealPortfolioMode = false }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = if (!showRealPortfolioMode) TvBlue else TvTextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Portofolio Simulasi",
+                            color = if (!showRealPortfolioMode) TvTextPrimary else TvTextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Tab 2: REAL TOKOCRYPTO
+                // JANGAN auto-refresh di sini — cuma switch UI + minta PIN kalau locked.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (showRealPortfolioMode) TvCardBackground else Color.Transparent)
+                        .clickable {
+                            if (!isRealBuyMode) {
+                                android.widget.Toast.makeText(context, "Mode Real Trade dinonaktifkan di Pengaturan", android.widget.Toast.LENGTH_SHORT).show()
+                                return@clickable
+                            }
+                            showRealPortfolioMode = true
+                            if (!isPinUnlocked) {
+                                if (!viewModel.hasSecurityPin()) {
+                                    onOpenSettings()
+                                } else {
+                                    showPinDialog = true
+                                }
+                            }
+                            // sudah unlock → pakai cache saldo, refresh manual via tombol ↻
+                        }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (!isRealBuyMode) Icons.Default.Lock else if (isPinUnlocked) Icons.Default.LockOpen else Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = if (showRealPortfolioMode) TvGreen else if (!isRealBuyMode) TvTextSecondary.copy(alpha = 0.5f) else TvTextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Portofolio Real (Tokocrypto)",
+                            color = if (showRealPortfolioMode) TvGreen else if (!isRealBuyMode) TvTextSecondary.copy(alpha = 0.5f) else TvTextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // CONTENT SECTION: REAL VS SIMULATION
+        if (showRealPortfolioMode) {
+            RealPortfolioView(
+                isPinUnlocked = isPinUnlocked,
+                realBalance = realBalance,
+                realFreeBalance = realFreeBalance,
+                realLockedBalance = realLockedBalance,
+                realOpenOrders = realOpenOrders,
+                realTrades = realTrades,
+                realAvgBuyPrices = realAvgBuyPrices,
+                isFetchingRealBalance = isFetchingRealBalance,
+                dashboardTicks = dashboardTicks,
+                currentTick = currentTick,
+                realTradeStatus = realTradeStatus,
+                onUnlockPin = {
+                    if (!viewModel.hasSecurityPin()) {
+                        onOpenSettings()
+                    } else {
+                        pinDialogError = null
+                        showPinDialog = true
+                    }
+                },
+                onRefreshRealBalance = { viewModel.fetchRealBalance() },
+                onCancelRealOrder = { symbol, orderId ->
+                    viewModel.executeCancelRealOrder(symbol, orderId) { _, _ -> }
+                },
+                onNavigateToDetail = onNavigateToDetail,
+                onSelectPair = { viewModel.selectPair(it) },
+                modifier = Modifier.weight(1f)
+            )
+        } else {
+            SimulationPortfolioView(
+                wallet = wallet,
+                history = displayHistory,
+                openOrders = openOrders,
+                holdings = holdings,
+                totalPortfolioValueIdr = totalPortfolioValueIdr,
+                totalUnrealizedPnlIdr = totalUnrealizedPnlIdr,
+                totalUnrealizedPnlPct = totalUnrealizedPnlPct,
+                selectedTab = selectedTab,
+                onSelectTab = { selectedTab = it },
+                onOpenTopUp = { showTopUpModal = true },
+                onNavigateToDetail = onNavigateToDetail,
+                onNavigateToSimulation = onNavigateToSimulation,
+                onCancelOrder = { orderId -> viewModel.cancelSimulationOrder(orderId) },
+                onCancelAllOrders = { symbol -> viewModel.cancelAllSimulationOrders(symbol) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // BOTTOM NAVIGATION BAR
+        AppBottomNavigationBar(
+            currentTab = NavTab.PORTOFOLIO,
+            onSelectTab = { tab ->
+                when (tab) {
+                    NavTab.WATCHLIST -> viewModel.navigateTo(AppScreen.DASHBOARD)
+                    NavTab.PORTOFOLIO -> { /* Sudah di Portofolio */ }
+                    NavTab.SIMULASI -> viewModel.openSimulation()
+                    NavTab.SETTINGS -> onOpenSettings()
+                }
+            }
+        )
+    }
+
+    if (showTopUpModal) {
+        SimulationTopUpModal(
+            wallet = wallet,
+            onTopUpIdr = { amount ->
+                viewModel.topUpSimulationBalance(amount)
+                showTopUpModal = false
+            },
+            onTopUpUsdt = { amount ->
+                viewModel.topUpSimulationUsdt(amount)
+                showTopUpModal = false
+            },
+            onBuyUsdtWithIdr = { idrAmount, rate ->
+                viewModel.buySimulationUsdtWithIdr(idrAmount, rate)
+                showTopUpModal = false
+            },
+            onReset = {
+                viewModel.resetSimulationAccount()
+                showTopUpModal = false
+            },
+            onDismiss = { showTopUpModal = false }
+        )
+    }
+
+    if (showPinDialog) {
+        SecurityPinDialog(
+            title = "VERIFIKASI PIN PORTOFOLIO REAL",
+            subtitle = "Masukkan 6-digit PIN untuk membuka akses Portofolio Tokocrypto.",
+            isSetupMode = false,
+            errorMessage = pinDialogError,
+            onPinSubmitted = { enteredPin ->
+                val ok = viewModel.verifyPin(enteredPin)
+                if (ok) {
+                    showPinDialog = false
+                    pinDialogError = null
+                    // Satu kali refresh setelah unlock PIN (cooldown di coordinator tetap berlaku)
+                    viewModel.fetchRealBalance()
+                } else {
+                    pinDialogError = "PIN Keamanan Salah. Silakan coba lagi."
+                }
+            },
+            onDismiss = {
+                showPinDialog = false
+                pinDialogError = null
+            }
+        )
+    }
+}
