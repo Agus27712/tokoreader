@@ -34,18 +34,19 @@ jobs:
       - name: Grant Execute Permission to Gradlew
         run: chmod +x gradlew
 
-      - name: Create Android debug keystore
+      - name: Prepare Debug Keystore
         run: |
-          mkdir -p $HOME/.android
-          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+          if [ -f "debug.keystore.base64" ]; then
+            echo "Decoding debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          elif [ ! -f "debug.keystore" ]; then
+            echo "Generating new debug.keystore in project root..."
             keytool -genkeypair -v \
-              -keystore $HOME/.android/debug.keystore \
+              -keystore debug.keystore \
               -storepass android -keypass android \
               -alias androiddebugkey \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
-          else
-            echo "Debug keystore already exists, skipping generation."
           fi
 
       - name: Build Debug APK

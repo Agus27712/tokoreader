@@ -40,7 +40,19 @@ android {
   }
   signingConfigs {
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      val ksFile = file("${rootDir}/debug.keystore")
+      if (!ksFile.exists()) {
+        val b64File = file("${rootDir}/debug.keystore.base64")
+        if (b64File.exists()) {
+          try {
+            val bytes = Base64.getDecoder().decode(b64File.readText().trim().replace("\n", "").replace("\r", ""))
+            ksFile.writeBytes(bytes)
+          } catch (e: Exception) {
+            System.err.println("Gagal decode debug.keystore.base64: ${e.message}")
+          }
+        }
+      }
+      storeFile = ksFile
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
