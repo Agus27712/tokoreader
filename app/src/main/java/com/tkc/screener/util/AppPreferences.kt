@@ -183,7 +183,7 @@ class AppPreferences(context: Context) {
 
     var updateRepo: String
         get() = DEFAULT_UPDATE_REPO
-        set(_) { /* hardcoded to Agus27712/analisa-pasar */ }
+        set(_) { /* hardcoded to Agus27712/tokoreader */ }
 
     var updateGitHubToken: String
         get() = ""
@@ -349,7 +349,7 @@ class AppPreferences(context: Context) {
     }
 
     companion object {
-        const val DEFAULT_UPDATE_REPO = "Agus27712/analisa-pasar"
+        const val DEFAULT_UPDATE_REPO = "Agus27712/tokoreader"
         private const val PREFS_NAME = "krypto_analysis_prefs"
         private const val KEY_GROQ = "groq_api_key"
         private const val KEY_GEMINI = "gemini_api_key"

@@ -1,0 +1,70 @@
+name: Android Debug Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release Debug APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Copy env.example to .env
+        run: cp .env.example .env || true
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Rename and Prepare APK Asset
+        run: |
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/tokoreader-update.apk
+          echo "APK built successfully"
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          echo "### TokoReader Debug Build" > release_notes.md
+          echo "Pembaruan otomatis dari GitHub Actions." >> release_notes.md
+          echo "Tanggal Build: $(date '+%Y-%m-%d %H:%M:%S')" >> release_notes.md
+          echo "Commit: ${{ github.sha }}" >> release_notes.md
+
+      - name: Publish to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TAG_NAME="latest-debug"
+            gh release delete "$TAG_NAME" --yes || true
+            git push --delete origin "$TAG_NAME" || true
+          fi
+          
+          gh release create "$TAG_NAME" \
+            release-artifacts/tokoreader-update.apk \
+            --title "TokoReader Debug Update - ${TAG_NAME}" \
+            --notes-file release_notes.md \
+            --clobber || true

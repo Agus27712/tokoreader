@@ -33,7 +33,7 @@ sealed class UpdateCheckResult {
 }
 
 object GitHubUpdater {
-    const val DEFAULT_REPO = "Agus27712/analisa-pasar"
+    const val DEFAULT_REPO = "Agus27712/tokoreader"
 
     suspend fun checkUpdate(context: Context, repo: String, token: String = ""): UpdateCheckResult = withContext(Dispatchers.IO) {
         val normalizedRepo = normalizeRepo(repo)
@@ -78,7 +78,7 @@ object GitHubUpdater {
 
                 val assets = releaseObj.optJSONArray("assets") ?: JSONArray()
                 var apkUrl = ""
-                var apkName = "analisa-pasar-update.apk"
+                var apkName = "tokoreader-update.apk"
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
                     val name = asset.optString("name", "")
@@ -131,7 +131,7 @@ object GitHubUpdater {
                                 versionName = latestVersion,
                                 releaseNotes = "Versi tag $tagName terdeteksi di GitHub ($normalizedRepo).",
                                 apkUrl = "https://github.com/$normalizedRepo/releases/download/$tagName/app-release.apk",
-                                apkName = "analisa-pasar-$latestVersion.apk",
+                                apkName = "tokoreader-$latestVersion.apk",
                                 htmlUrl = tagHtmlUrl
                             )
                         )
@@ -264,7 +264,7 @@ object GitHubUpdater {
             if (!downloadDir.exists() && !downloadDir.mkdirs()) {
                 throw IllegalStateException("Gagal membuat folder penyimpanan update")
             }
-            val safeName = apkName.substringAfterLast('/').ifBlank { "analisa-pasar-update.apk" }
+            val safeName = apkName.substringAfterLast('/').ifBlank { "tokoreader-update.apk" }
             val apkFile = File(downloadDir, safeName)
             if (apkFile.exists()) apkFile.delete()
 
