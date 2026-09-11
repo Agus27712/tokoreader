@@ -158,21 +158,36 @@ data class TradingPair(
     ) {
     companion object {
         val POPULAR_TOKOCRYPTO_PAIRS = listOf(
+            // Top High Volume IDR Pairs
             TradingPair("BTCIDR", "BTC", "IDR", "Bitcoin / IDR", tokocryptoPair = "btc_idr"),
             TradingPair("ETHIDR", "ETH", "IDR", "Ethereum / IDR", tokocryptoPair = "eth_idr"),
-            TradingPair("USDTIDR", "USDT", "IDR", "Tether / IDR", tokocryptoPair = "usdt_idr"),
             TradingPair("SOLIDR", "SOL", "IDR", "Solana / IDR", tokocryptoPair = "sol_idr"),
             TradingPair("BNBIDR", "BNB", "IDR", "BNB / IDR", tokocryptoPair = "bnb_idr"),
             TradingPair("XRPIDR", "XRP", "IDR", "XRP / IDR", tokocryptoPair = "xrp_idr"),
             TradingPair("DOGEIDR", "DOGE", "IDR", "Dogecoin / IDR", tokocryptoPair = "doge_idr"),
             TradingPair("TKOIDR", "TKO", "IDR", "Tokocrypto / IDR", tokocryptoPair = "tko_idr"),
             TradingPair("SUIIDR", "SUI", "IDR", "Sui / IDR", tokocryptoPair = "sui_idr"),
+            TradingPair("PEPEIDR", "PEPE", "IDR", "PEPE / IDR", tokocryptoPair = "pepe_idr"),
             TradingPair("AVAXIDR", "AVAX", "IDR", "Avalanche / IDR", tokocryptoPair = "avax_idr"),
             TradingPair("ADAIDR", "ADA", "IDR", "Cardano / IDR", tokocryptoPair = "ada_idr"),
-            TradingPair("RENDERIDR", "RENDER", "IDR", "Render / IDR", tokocryptoPair = "render_idr"),
             TradingPair("WIFIDR", "WIF", "IDR", "dogwifhat / IDR", tokocryptoPair = "wif_idr"),
-            TradingPair("WLDIDR", "WLD", "IDR", "Worldcoin / IDR", tokocryptoPair = "wld_idr"),
-            TradingPair("TAOIDR", "TAO", "IDR", "Bittensor / IDR", tokocryptoPair = "tao_idr")
+            TradingPair("USDTIDR", "USDT", "IDR", "Tether / IDR", tokocryptoPair = "usdt_idr"),
+
+            // Top High Volume USDT Pairs (Binance / Tokocrypto Global - High Liquidity Scalping & Trenching)
+            TradingPair("BTCUSDT", "BTC", "USDT", "Bitcoin / USDT", tokocryptoPair = "btc_usdt"),
+            TradingPair("ETHUSDT", "ETH", "USDT", "Ethereum / USDT", tokocryptoPair = "eth_usdt"),
+            TradingPair("SOLUSDT", "SOL", "USDT", "Solana / USDT", tokocryptoPair = "sol_usdt"),
+            TradingPair("BNBUSDT", "BNB", "USDT", "BNB / USDT", tokocryptoPair = "bnb_usdt"),
+            TradingPair("XRPUSDT", "XRP", "USDT", "XRP / USDT", tokocryptoPair = "xrp_usdt"),
+            TradingPair("DOGEUSDT", "DOGE", "USDT", "Dogecoin / USDT", tokocryptoPair = "doge_usdt"),
+            TradingPair("PEPEUSDT", "PEPE", "USDT", "PEPE / USDT", tokocryptoPair = "pepe_usdt"),
+            TradingPair("SHIBUSDT", "SHIB", "USDT", "Shiba Inu / USDT", tokocryptoPair = "shib_usdt"),
+            TradingPair("SUIUSDT", "SUI", "USDT", "Sui / USDT", tokocryptoPair = "sui_usdt"),
+            TradingPair("AVAXUSDT", "AVAX", "USDT", "Avalanche / USDT", tokocryptoPair = "avax_usdt"),
+            TradingPair("NEARUSDT", "NEAR", "USDT", "NEAR Protocol / USDT", tokocryptoPair = "near_usdt"),
+            TradingPair("WIFUSDT", "WIF", "USDT", "dogwifhat / USDT", tokocryptoPair = "wif_usdt"),
+            TradingPair("TAOUSDT", "TAO", "USDT", "Bittensor / USDT", tokocryptoPair = "tao_usdt"),
+            TradingPair("FLOKIUSDT", "FLOKI", "USDT", "Floki / USDT", tokocryptoPair = "floki_usdt")
         )
 
                 val POPULAR_PAIRS = POPULAR_TOKOCRYPTO_PAIRS

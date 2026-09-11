@@ -248,10 +248,27 @@ class AppPreferences(context: Context) {
 
     fun getWatchlist(): Set<String> {
         val saved = prefs.getStringSet(KEY_WATCHLIST_TOKOCRYPTO, null)
-        if (saved != null && saved.isNotEmpty()) return saved.toSet()
+        val defaultMixed = setOf(
+            "BTCIDR", "BTCUSDT",
+            "ETHIDR", "ETHUSDT",
+            "SOLIDR", "SOLUSDT",
+            "BNBIDR", "BNBUSDT",
+            "XRPIDR", "XRPUSDT",
+            "PEPEUSDT", "PEPEIDR",
+            "DOGEUSDT", "DOGEIDR",
+            "SUIUSDT", "SUIIDR",
+            "AVAXUSDT", "AVAXIDR",
+            "WIFUSDT", "TKOIDR"
+        )
+        if (saved != null && saved.isNotEmpty()) {
+            if (saved.size == 1 && saved.contains("BTCIDR")) {
+                return defaultMixed
+            }
+            return saved.toSet()
+        }
         val legacy = prefs.getStringSet(KEY_WATCHLIST_LEGACY, null)
         if (legacy != null && legacy.isNotEmpty()) return legacy.toSet()
-        return setOf("BTCIDR")
+        return defaultMixed
     }
 
     fun toggleWatchlist(symbol: String): Boolean {

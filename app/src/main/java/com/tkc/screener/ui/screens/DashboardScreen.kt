@@ -108,21 +108,26 @@ fun DashboardScreen(
     ) {
         when (selectedRankingTab) {
             MarketRankingTab.WATCHLIST -> {
-                // Hanya pair IDR saja (15 pair bervolume besar dan aktivitas tinggi di Tokocrypto)
-                val idrPopular = TradingPair.POPULAR_TOKOCRYPTO_PAIRS.filter { it.quoteAsset.equals("IDR", ignoreCase = true) }
+                // Pair campuran USDT dan IDR bervolume besar & transaksi tinggi untuk pengujian scalping/trenching
+                val userWatchPairs = watchlist.map { TradingPair.fromCustomSymbol(it, "IDR") }
+                val popularPairs = TradingPair.POPULAR_TOKOCRYPTO_PAIRS
                 val fromMarket = (topVolumeCoins + gainersCoins + hotCoins + secondWaveCoins)
                     .map { TradingPair.fromCustomSymbol(it.symbol, "IDR") }
-                    .filter { it.quoteAsset.equals("IDR", ignoreCase = true) }
-                val merged = (idrPopular + fromMarket).distinctBy { it.symbol }
+                val merged = (userWatchPairs + popularPairs + fromMarket).distinctBy { it.symbol }
 
                 val safePairs = merged.filter { pair ->
+                    if (!TokocryptoMarketService.isTokocryptoSupported(pair.symbol)) {
+                        return@filter false
+                    }
                     val t = allTicks[pair.symbol] ?: allTicks[pair.effectiveTokocryptoPair()] ?: return@filter true
+                    val isIdr = pair.quoteAsset.equals("IDR", ignoreCase = true)
                     TokocryptoMarketService.isSafeTradableAsset(
                         price = t.price,
                         volume24h = t.volume24h,
                         high24h = t.high24h,
                         low24h = t.low24h,
-                        isIdrPair = true
+                        isIdrPair = isIdr,
+                        isExplicitlyFavored = favorites.contains(pair.symbol) || watchlist.contains(pair.symbol)
                     )
                 }
 
@@ -130,10 +135,13 @@ fun DashboardScreen(
                     val t = allTicks[pair.symbol] ?: allTicks[pair.effectiveTokocryptoPair()]
                     val vol = t?.volume24h?.coerceAtLeast(0.0) ?: 0.0
                     val ch = t?.change24h?.takeIf { c -> c.isFinite() } ?: 0.0
-                    val volScore = kotlin.math.ln(vol + 1.0)
+                    val isIdr = pair.quoteAsset.equals("IDR", ignoreCase = true)
+                    val normalizedVol = if (isIdr) vol / 16000.0 else vol
+                    val volScore = kotlin.math.ln(normalizedVol + 1.0)
                     val momScore = kotlin.math.abs(ch) * 2.0
-                    volScore + momScore
-                }.take(15)
+                    val isFavBonus = if (favorites.contains(pair.symbol)) 4.0 else 0.0
+                    volScore + momScore + isFavBonus
+                }.take(25)
             }
             MarketRankingTab.FAVORITE -> {
                 favorites.map { TradingPair.fromCustomSymbol(it, defaultQuote) }.distinctBy { it.symbol }

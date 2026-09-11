@@ -39,10 +39,21 @@ object TokocryptoMarketService {
     private var cachedTokocryptoSymbols: Set<String>? = null
     private var cachedTokocryptoSymbolsTime = 0L
 
+    fun getCachedOfficialSymbols(): Set<String> =
+        (cachedTokocryptoSymbols ?: emptySet()).ifEmpty { TokocryptoSymbolsWhitelist.ALL_SYMBOLS }
+
+    fun isTokocryptoSupported(symbol: String): Boolean {
+        val official = getCachedOfficialSymbols()
+        val clean = symbol.uppercase().replace("/", "").replace("-", "").replace("_", "")
+        val normalized = clean.replace("BIDR", "IDR")
+        val pId = toPairId(symbol).uppercase().replace("_", "")
+        return official.contains(clean) || official.contains(normalized) || official.contains(pId)
+    }
+
     suspend fun getOfficialTokocryptoSymbols(): Set<String> {
         val now = System.currentTimeMillis()
         val current = cachedTokocryptoSymbols
-        if (current != null && (now - cachedTokocryptoSymbolsTime) < 30 * 60 * 1000L) {
+        if (current != null && current.isNotEmpty() && (now - cachedTokocryptoSymbolsTime) < 30 * 60 * 1000L) {
             return current
         }
         return withContext(Dispatchers.IO) {
@@ -67,13 +78,15 @@ object TokocryptoMarketService {
                                 set.add("${base}_${quote}".uppercase())
                             }
                         }
-                        cachedTokocryptoSymbols = set
-                        cachedTokocryptoSymbolsTime = now
-                        return@withContext set
+                        if (set.isNotEmpty()) {
+                            cachedTokocryptoSymbols = set
+                            cachedTokocryptoSymbolsTime = now
+                            return@withContext set
+                        }
                     }
                 }
             } catch (_: Exception) {}
-            cachedTokocryptoSymbols ?: emptySet()
+            cachedTokocryptoSymbols ?: TokocryptoSymbolsWhitelist.ALL_SYMBOLS
         }
     }
 
