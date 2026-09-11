@@ -77,10 +77,21 @@ jobs:
             TAG_NAME="latest-debug"
             gh release delete "$TAG_NAME" --yes || true
             git push --delete origin "$TAG_NAME" || true
+      - name: Publish to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TAG_NAME="latest-debug"
+            # Delete existing release and tag
+            gh release delete "$TAG_NAME" --yes || true
+            git push --delete origin "$TAG_NAME" || true
           fi
           
+          # Create new release
           gh release create "$TAG_NAME" \
             release-artifacts/tokoreader-update.apk \
             --title "TokoReader Debug Update - ${TAG_NAME}" \
-            --notes-file release_notes.md \
-            --clobber || true
+            --notes-file release_notes.md
