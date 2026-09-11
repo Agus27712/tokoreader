@@ -433,8 +433,8 @@ fun DetailChartScreen(
                         android.widget.Toast.makeText(context, "Harga belum tersedia.", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 },
-                onExecuteSell = { sellQty, isAutoSell, tp1P, tp1Pct, tp2P, tp2Pct ->
-                    val execPrice = if (displayPrice > 0.0) displayPrice else signal.targetPrice1
+                onExecuteSell = { sellQty, isAutoSell, tp1P, tp1Pct, tp2P, tp2Pct, customTargetSellPrice ->
+                    val execPrice = if (customTargetSellPrice > 0.0) customTargetSellPrice else (if (displayPrice > 0.0) displayPrice else signal.targetPrice1)
                     if (execPrice > 0) {
                         viewModel.executeSellOrders(
                             pair = pair,

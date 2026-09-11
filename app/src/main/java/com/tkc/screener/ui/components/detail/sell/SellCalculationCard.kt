@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tkc.screener.ui.theme.*
 import com.tkc.screener.util.PriceFormatter
+import androidx.compose.foundation.clickable
 import com.tkc.screener.ui.components.detail.TransactionDetailRow
 import java.util.Locale
 
@@ -36,7 +37,9 @@ fun SellCalculationCard(
     isProfitable: Boolean,
     netProfitIdr: Double,
     netProfitPct: Double,
-    onManualBuyClick: () -> Unit
+    onManualBuyClick: () -> Unit,
+    customTargetSellPrice: Double = 0.0,
+    onSetLimitClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -46,10 +49,41 @@ fun SellCalculationCard(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        TransactionDetailRow(
-            label = "Harga Jual Sekarang",
-            value = "${PriceFormatter.formatAmountWithQuote(validPrice, quoteAsset)} $quoteAsset"
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (customTargetSellPrice > 0.0 && customTargetSellPrice != validPrice) "Harga Jual (Limit)" else "Harga Jual (Pasar)",
+                    color = TvTextSecondary,
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.width(6.dp))
+                Surface(
+                    modifier = Modifier.clickable { onSetLimitClick?.invoke() },
+                    shape = RoundedCornerShape(4.dp),
+                    color = TvRed.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(0.5.dp, TvRed)
+                ) {
+                    Text(
+                        text = "Atur Limit",
+                        color = TvRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Text(
+                text = "${PriceFormatter.formatAmountWithQuote(if (customTargetSellPrice > 0.0) customTargetSellPrice else validPrice, quoteAsset)} $quoteAsset",
+                color = if (customTargetSellPrice > 0.0 && customTargetSellPrice != validPrice) TvRed else TvTextPrimary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
         TransactionDetailRow(
             label = "Jumlah Koin Dijual",
             value = "${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset",

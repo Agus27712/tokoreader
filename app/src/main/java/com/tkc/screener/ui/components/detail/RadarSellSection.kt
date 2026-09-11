@@ -42,7 +42,7 @@ fun RadarSellSection(
     onSellQuantityChanged: (Double) -> Unit,
     activeFeePct: Double,
     isRealMode: Boolean,
-    onExecuteSell: ((Double, Boolean, Double, Double, Double, Double) -> Unit)?,
+    onExecuteSell: ((Double, Boolean, Double, Double, Double, Double, Double) -> Unit)?,
     onSetManualBuyPrice: ((Double, Double) -> Unit)? = null,
     spotPosition: com.tkc.screener.trading.SpotPosition? = null,
     onSetTrailingStop: ((Boolean, Double) -> Unit)? = null,
@@ -68,6 +68,9 @@ fun RadarSellSection(
     var isCustomSellQtyOpen by remember { mutableStateOf(false) }
     var selectedSellPercent by remember { mutableIntStateOf(100) }
 
+    var customTargetSellPrice by remember { mutableDoubleStateOf(0.0) }
+    var showSellOrderDialog by remember { mutableStateOf(false) }
+
     val isTrailingActive = spotPosition?.isTrailingEnabled == true
     val trailingPercent = spotPosition?.trailingPercent ?: 2.0
     val peakPrice = spotPosition?.peakPrice ?: validPrice
@@ -80,9 +83,11 @@ fun RadarSellSection(
     val focusManager = LocalFocusManager.current
 
     val activeSellQty = if (selectedSellQuantity > 0.0) selectedSellQuantity else availableCoin
-    val grossSellValueIdr = activeSellQty * validPrice
+    val effectiveSellPrice = if (customTargetSellPrice > 0.0) customTargetSellPrice else validPrice
+    val grossSellValueIdr = activeSellQty * effectiveSellPrice
     val sellFeeIdr = grossSellValueIdr * (activeFeePct / 100.0)
     val netReceivedSellIdr = (grossSellValueIdr - sellFeeIdr).coerceAtLeast(0.0)
+
 
     val effectiveBuyPrice = avgBuyPrice
     val costBasisIdr = activeSellQty * effectiveBuyPrice
@@ -187,7 +192,9 @@ fun RadarSellSection(
             isProfitable = isProfitable,
             netProfitIdr = netProfitIdr,
             netProfitPct = netProfitPct,
-            onManualBuyClick = { showManualDialog = true }
+            onManualBuyClick = { showManualDialog = true },
+            customTargetSellPrice = customTargetSellPrice,
+            onSetLimitClick = { showSellOrderDialog = true }
         )
 
         // AUTO TP1/TP2 untuk simulasi maupun real mode saat user buka switch & tap SIMPAN
@@ -228,6 +235,7 @@ fun RadarSellSection(
         val sellButtonLabel = when {
             hasTwoTpOrders -> "${if (isRealMode) "[REAL] " else "[SIMULASI] "}PASANG 2 ORDER TP (${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset)"
             hasSingleTpOrder -> "${if (isRealMode) "[REAL] " else "[SIMULASI] "}PASANG ORDER TP (${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset)"
+            customTargetSellPrice > 0.0 && customTargetSellPrice != validPrice -> "${if (isRealMode) "[REAL] " else "[SIMULASI] "}JUAL LIMIT (@${PriceFormatter.formatAmountWithQuote(customTargetSellPrice, quoteAsset)})"
             else -> "${if (isRealMode) "[REAL] " else "[SIMULASI] "}JUAL ${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset"
         }
 
@@ -236,7 +244,7 @@ fun RadarSellSection(
                 if (isRealMode) {
                     showSellConfirmDialog = true
                 } else {
-                    onExecuteSell?.invoke(activeSellQty, isAutoSellActive, parsedTp1Price, parsedTp1Pct, parsedTp2Price, parsedTp2Pct)
+                    onExecuteSell?.invoke(activeSellQty, isAutoSellActive, parsedTp1Price, parsedTp1Pct, parsedTp2Price, parsedTp2Pct, customTargetSellPrice)
                 }
             },
             modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -278,6 +286,19 @@ fun RadarSellSection(
         }
     )
 
+    CustomSellOrderDialog(
+        show = showSellOrderDialog,
+        onDismiss = { showSellOrderDialog = false },
+        validPrice = validPrice,
+        baseAsset = baseAsset,
+        quoteAsset = quoteAsset,
+        initialTargetSellPrice = customTargetSellPrice,
+        isRealMode = isRealMode,
+        onConfirmSell = { price ->
+            customTargetSellPrice = price
+        }
+    )
+
     if (showSellConfirmDialog) {
         val parsedTp1Price = PriceFormatter.parseCleanDouble(tp1PriceInput, quoteAsset)
         val parsedTp1Pct = PriceFormatter.parseCleanDouble(tp1PercentInput).coerceIn(1.0, 99.0).takeIf { it > 0 } ?: 50.0
@@ -300,7 +321,9 @@ fun RadarSellSection(
                     "• TP 1: ${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset @ ${PriceFormatter.formatAmountWithQuote(parsedTp1Price, quoteAsset)} $quoteAsset\n\nLanjutkan?"
             isAutoSellActive && parsedTp2Price > 0.0 -> "Anda akan memasang 1 order jual Limit TP2 di Tokocrypto:\n\n" +
                     "• TP 2: ${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset @ ${PriceFormatter.formatAmountWithQuote(parsedTp2Price, quoteAsset)} $quoteAsset\n\nLanjutkan?"
-            else -> "Anda akan memasang 1 order jual Limit di Tokocrypto:\n\n" +
+            customTargetSellPrice > 0.0 && customTargetSellPrice != validPrice -> "Anda akan memasang 1 order jual Limit di Tokocrypto:\n\n" +
+                    "• ${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset di harga LIMIT (${PriceFormatter.formatAmountWithQuote(customTargetSellPrice, quoteAsset)} $quoteAsset).\n\nLanjutkan?"
+            else -> "Anda akan memasang 1 order jual di Tokocrypto:\n\n" +
                     "• ${PriceFormatter.formatCryptoExact(activeSellQty, 8)} $baseAsset di harga pasar saat ini (${PriceFormatter.formatAmountWithQuote(validPrice, quoteAsset)} $quoteAsset).\n\nLanjutkan?"
         }
 
@@ -320,7 +343,7 @@ fun RadarSellSection(
             confirmButton = {
                 Button(
                     onClick = {
-                        onExecuteSell?.invoke(activeSellQty, isAutoSellActive, parsedTp1Price, parsedTp1Pct, parsedTp2Price, parsedTp2Pct)
+                        onExecuteSell?.invoke(activeSellQty, isAutoSellActive, parsedTp1Price, parsedTp1Pct, parsedTp2Price, parsedTp2Pct, customTargetSellPrice)
                         showSellConfirmDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = TvRed)
